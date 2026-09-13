@@ -18,6 +18,10 @@
 \usepackage{siunitx}
 \usepackage{booktabs}
 \usepackage{placeins}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\newsavebox{\tableReferenceBox}
+\newlength{\tableReferenceWidth}
 
 \documentsetup{
   % No empty lines in the setup
@@ -176,7 +180,8 @@ where $H_{s_j i}(t)$ denotes the shortest hop distance in $G(t)$. This idealized
 	\centering
 	\caption{Notation Descriptions}
 	\label{tab:1}
-	\begin{tabular}{lp{0.68\linewidth}}
+\begin{lrbox}{\tableReferenceBox}
+\begin{tabular}{lp{0.68\linewidth}}
 		\toprule
 		Notation & Description \\
 		\midrule
@@ -208,6 +213,9 @@ where $H_{s_j i}(t)$ denotes the shortest hop distance in $G(t)$. This idealized
 		$M_{\mathrm{SG}}/N_{\mathrm{TC}}$ & Messages per completed task \\
 		\bottomrule
 	\end{tabular}
+\end{lrbox}
+\global\tableReferenceWidth=\wd\tableReferenceBox
+\usebox{\tableReferenceBox}
 \end{table}
 
 To ensure a fair comparison with the localized information sharing framework in the reference study, the main evaluation metrics follow the baseline study~\cite{nayak2025limited}, including NTC, MSG, TTD, and MST. Their aggregation rules in this implementation are specified in Section~4.1. In addition, MSG/NTC is further introduced as a derived metric to evaluate the communication cost required for each completed task. It should be noted that the proposed PP-AT algorithm is not a new task allocator designed to replace allocators such as MPDM. Instead, PP-AT acts as a communication-control mechanism that adjusts the propagation range of task messages before the task allocator takes effect. In summary, the problem studied in this paper is to determine a task-specific TTL for each dynamically released task under localized information sharing, so that communication overhead can be reduced while maintaining the number of completed tasks.
@@ -236,7 +244,8 @@ Based on the one-hop neighborhood information obtained from $\mathcal{N}_1(s_j)$
 	\centering
 	\caption{State Factors Used in TTL Upper Bound Estimation}
 	\label{tab:2}
-	\begin{tabular}{lp{0.52\linewidth}p{0.18\linewidth}}
+\resizebox{\tableReferenceWidth}{!}{%
+\begin{tabular}{lp{0.52\linewidth}p{0.18\linewidth}}
 		\toprule
 		Symbol & Description & Range \\
 		\midrule
@@ -260,6 +269,7 @@ Based on the one-hop neighborhood information obtained from $\mathcal{N}_1(s_j)$
 		$\operatorname{mean}(\mathrm{load})$ & Mean value of local robot loads & non-negative scalar \\
 		\bottomrule
 	\end{tabular}
+}
 \end{table}
 The four state factors are normalized to $[0,1]$ as follows.
 \[
@@ -370,6 +380,50 @@ It should be stated that PP-AT controls task-message propagation, waiting, and r
 
 
 
+Algorithm~\ref{alg:ppat} summarizes the event-driven communication controller. A ready status hands the task to MPDM; it does not imply successful assignment or completion.
+
+\begin{algorithm}[htb]
+\caption{Protected Progressive Adaptive TTL (PP-AT)}
+\label{alg:ppat}
+\small
+\begin{algorithmic}[1]
+\Require Task $\tau_j$, source $s_j$, local reports, time $t$, collection interval $\Delta_c$
+\Ensure Updated TTL $h_j$, report cache, and controller status
+\Statex \textbf{On task discovery:}
+\State Compute $P_j,R_j,C_j,L_j$ and estimate $H_j$
+\State $W_j\gets W_{\max}-(W_{\max}-W_{\min})P_j$; $h_j\gets1$
+\State Initialize the report cache and persistent flood history
+\State Propagate at $h_j$ using incremental NetFlood and collect reports
+\State Schedule the first decision at $t+2\Delta_c$
+\Statex \textbf{On a scheduled decision for a pending task:}
+\State Update the source's own state locally
+\For{each visible remote report with $\widehat q_i\geq q_j$ and $t-\widehat t_i\geq A_{\max}$}
+    \State Refresh via NetFlood at $h_j$ and count StateMSG
+    \State Update the report if received; otherwise invalidate its membership
+\EndFor
+\State Form $\mathcal{F}_j(h_j,t)$ and $\mathcal{C}^{\mathrm{imm}}_j(h_j,t)$ using reported states
+\If{$\mathcal{C}^{\mathrm{imm}}_j(h_j,t)\neq\varnothing$}
+    \State Mark the controller ready and hand the task to MPDM
+\Else
+    \State Compute $w_j(t)$ using Eq.~\ref{eq:local_wait}
+    \If{$w_j(t)\leq W_j$}
+        \State Retain $h_j$ and schedule reassessment at $t+\max\{\Delta_c,w_j(t)\}$
+    \ElsIf{$h_j<H_j$}
+        \State $h_j\gets h_j+1$
+        \State Extend the persistent flood and collect additional reports
+        \State Schedule reassessment at $t+2\Delta_c$
+    \Else
+        \State Mark the controller \texttt{max\_reached}; return to the task lifecycle
+    \EndIf
+\EndIf
+\Statex \textbf{On receiving an existing allocation-result dissemination:}
+\For{each pending task at a reached source that already stores the assigned robot's report}
+    \State Update reported busy-until time, load, and timestamp
+    \State Reactivate its controller and schedule reassessment at $t+\Delta_c$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
 \section{4. Experiments and Results}
 This section evaluates the effectiveness of the proposed PP-AT method through simulation experiments. The experiments are conducted based on the NetFlood + MPDM framework, and the PP-AT method is compared with fixed-TTL baseline methods from Fixed TTL = 1 to Fixed TTL = 5. The evaluation focuses on whether PP-AT can reduce communication overhead while maintaining task completion performance.
 \subsection{4.1 Experimental Setup}
@@ -380,7 +434,8 @@ To ensure a fair comparison, all methods are evaluated under the same task scena
 	\centering
 	\caption{Experimental Parameters}
 	\label{tab:exp_parameters}
-	\begin{tabular}{ll}
+\resizebox{\tableReferenceWidth}{!}{%
+\begin{tabular}{ll}
 		\toprule
 		Parameter & Value \\
 		\midrule
@@ -419,6 +474,7 @@ To ensure a fair comparison, all methods are evaluated under the same task scena
 		Message counting mode & Link copies \\
 		\bottomrule
 	\end{tabular}
+}
 \end{table}
 
 The environment follows the workspace geometry, task clusters, robot speed, discovery radius, and execution-time range stated in the reference study~\cite{nayak2025limited}. The 60-robot, 2-tasks/s case is used as the base setting. Parameters not fully specified in that study are explicit implementation assumptions: a 500-s horizon, a 1-s time step and collection interval, exponential task interarrival times, uniform resource demand in $[8,25]$, uniform priority in $[0,1]$, and deterministic random-waypoint exploration by idle robots. Initial robot positions are sampled uniformly over the workspace. Task locations are sampled around the four centers with equal probability and clipped to the workspace boundary; resource demand and execution time are continuous uniform samples. This is a reference-aligned reconstruction, rather than an exact reproduction of the original simulator. Communication is limited by range, topology, and TTL; the model does not simulate a bandwidth cap, packet loss, MAC contention, or delay jitter.
@@ -452,6 +508,7 @@ Table~\ref{tab:main_results} summarizes the main comparison results between PP-A
 \centering
 \caption{Main Comparison Results Under MPDM}
 \label{tab:main_results}
+\resizebox{\tableReferenceWidth}{!}{%
 \begin{tabular}{lccccc}
 \toprule
 Method & NTC & MSG & MSG/NTC & TTD (s) & MST (s) \\
@@ -464,6 +521,7 @@ Fixed TTL = 5 & $255.05 \pm 3.82$ & $243248.90 \pm 49507.70$ & $954.77 \pm 199.7
 PP-AT & $255.50 \pm 4.29$ & $16269.50 \pm 1956.21$ & $63.72 \pm 7.92$ & $1383.62 \pm 57.81$ & $6476.55 \pm 160.62$ \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 As shown in Tables~\ref{tab:main_results} and~\ref{tab:marl_results}, PP-AT achieves a similar mean NTC to the fixed-TTL baselines under both MPDM and MARL. These mean values alone do not establish statistical equivalence. The corresponding MSG and MSG/NTC comparisons are presented in Figs.~\ref{fig:msg_comparison} and~\ref{fig:msg_per_ntc_comparison} for MPDM, and in Figs.~\ref{fig:marl_msg_comparison} and~\ref{fig:marl_msg_per_ntc_comparison} for MARL. Tables report mean $\pm$ sample standard deviation across 20 paired seeds within each allocator group.
@@ -504,6 +562,7 @@ The task completion results in Figs.~\ref{fig:ntc_comparison} and~\ref{fig:marl_
 \centering
 \caption{Auxiliary Comparison Results Under MARL}
 \label{tab:marl_results}
+\resizebox{\tableReferenceWidth}{!}{%
 \begin{tabular}{lccccc}
 \toprule
 Method & NTC & MSG & MSG/NTC & TTD (s) & MST (s) \\
@@ -516,6 +575,7 @@ Fixed TTL = 5 & $253.80 \pm 5.34$ & $269748.65 \pm 59998.66$ & $1062.55 \pm 233.
 PP-AT & $254.90 \pm 4.76$ & $13098.45 \pm 853.83$ & $51.40 \pm 3.51$ & $1588.91 \pm 65.10$ & $6719.01 \pm 190.04$ \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 
@@ -557,6 +617,7 @@ To further examine PP-AT under different environments, it is compared with Fixed
 \begingroup
 \small
 \setlength{\tabcolsep}{4pt}
+\resizebox{\tableReferenceWidth}{!}{%
 \begin{tabular}{lrrrr}
 \toprule
 Configuration & NTC & MSG & MSG/NTC & Rejections \\
@@ -566,6 +627,7 @@ No state refresh & $254.80 \pm 4.58$ & $18094.05 \pm 1801.81$ & $71.03 \pm 7.21$
 No assignment awareness & $253.35 \pm 4.04$ & $17340.60 \pm 2134.22$ & $68.41 \pm 8.03$ & $65.40 \pm 13.85$ \\
 \bottomrule
 \end{tabular}
+}
 \par\smallskip
 \begin{minipage}{\linewidth}
 \footnotesize
