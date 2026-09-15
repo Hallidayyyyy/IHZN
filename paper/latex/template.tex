@@ -17,6 +17,7 @@
 
 \usepackage{siunitx}
 \usepackage{booktabs}
+\usepackage{tabularx}
 \usepackage{placeins}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
@@ -86,9 +87,9 @@ Dandan Li
 
 
 \begin{abstract}
- Multi-robot systems are now being applied in an increasing number of fields. However, limited communication infrastructure in practical scenarios may require decentralized operation with local information sharing. Therefore, local communication mechanisms are critical for information sharing among robots. As the operational area expands, information sharing becomes increasingly difficult. Fixed TTL strategies do not adjust the propagation range to individual task needs, which may affect task allocation efficiency.
+ Multi-robot systems are now being applied in an increasing number of fields. However, limited communication infrastructure in practical scenarios may require decentralized operation with local information sharing. Therefore, local communication mechanisms are critical for information sharing among robots. As the operational area expands, information sharing becomes increasingly difficult. Fixed Time To Live(TTL) strategies do not adjust the propagation range to individual task needs, which may affect task allocation efficiency.
  To address this issue, this paper proposes a protected progressive adaptive time-to-live mechanism, namely PP-AT, for communication-efficient multi-robot task allocation under limited information sharing. When a task is released, the robot that first discovers the task becomes the source node. The source node calculates the TTL upper bound of the task using the collected task state and local robot state. Then, it propagates the task information from TTL = 1 and gradually expands the propagation range only when feasible candidate robots are insufficient. A protection mechanism uses state refresh and assignment awareness to maintain candidate information and guide subsequent propagation. Expansion stops when the candidate set satisfies the feasibility condition or when the TTL reaches the upper bound.
- The proposed method is evaluated in a NetFlood + MPDM environment and compared with fixed TTL baselines from 1 to 5. Simulation results show lower communication overhead than Fixed TTL = 2--5 in the tested settings, while Fixed TTL = 1 retains lower overhead.
+ The proposed method is evaluated in a NetFlood + MPDM environment and compared with fixed TTL baselines from 1 to 5. Simulation results show that, in the tested settings, the proposed method substantially reduces communication overhead compared with Fixed TTL while keeping the relative change in the number of completed tasks within 1\%.
  \paragraph{Keywords:} Multi-robot task allocation, limited information sharing, adaptive TTL, local communication, NetFlood, communication overhead
 \end{abstract}
 
@@ -106,7 +107,7 @@ In localized information sharing, time-to-live (TTL) is a key factor because it 
 
 To address this issue, this paper proposes a protected progressive adaptive TTL method (PP-AT), which dynamically controls TTL according to task states and local robot states. The proposed method calculates a task-specific TTL upper bound based on four local state factors, and the communication range is progressively expanded only when the current range cannot provide sufficient feasible candidate robots. In this way, PP-AT avoids starting every task with a large TTL and allows expansion when one-hop information is insufficient.
 
-During the progressive TTL expansion process, a protection mechanism is further introduced. This mechanism checks whether the current communication range can still support task allocation before deciding whether the task message should continue to be propagated. The purpose of this mechanism is to reduce repeated communication while avoiding degradation in the task completion rate caused by an overly small TTL.
+During the progressive TTL expansion process, a protection mechanism is further introduced. This mechanism uses state refresh and assignment awareness to update candidate information and guide subsequent propagation decisions. Its purpose is to reduce the risk of making allocation decisions based on outdated reports and limit unnecessary communication.
 
 The proposed mechanism is integrated into a NetFlood-based localized information sharing framework and evaluated with an MPDM-based task allocation method. Fixed TTL values from 1 to 5 are used as baseline methods. The evaluation metrics include the number of transmitted messages (MSG), the number of completed tasks (NTC), the message cost per completed task (MSG/NTC), total travel delay (TTD), and make-span time (MST). Experimental results show lower communication overhead relative to Fixed TTL = 2--5 with comparable mean task completion in the tested settings. Fixed TTL = 1 retains lower communication overhead.
 
@@ -371,7 +372,7 @@ The refresh uses NetFlood with the current TTL and is included in StateMSG. The 
 To reduce repeated forwarding during expansion, each task retains its reached-node set and forwarding history. Only nodes on the current propagation frontier that have not forwarded this task message send it to their current neighbors. A node forwards at most once during the task flood, while each outgoing neighbor copy is counted, including copies received by nodes that already know the task. State reports are cached between expansion rounds, with stale reports refreshed as described above. Consequently, the reached set depends on the propagation history and need not equal the instantaneous hop neighborhood in $G(t)$.
 
 \subsection{3.4 Integration with MPDM}
-To reproduce the conclusions of the reference study as closely as possible, this paper adopts the MPDM + NetFlood framework and integrates the proposed PP-AT mechanism into it. PP-AT is used to determine the propagation range of task messages, while the MPDM allocator is used to complete task allocation among candidate robots that receive the task messages.
+Following the localized information-sharing framework of the reference study, this paper adopts MPDM + NetFlood and integrates the proposed PP-AT mechanism for comparison with fixed-TTL baselines. PP-AT is used to determine the propagation range of task messages, while the MPDM allocator is used to complete task allocation among candidate robots that receive the task messages.
 
 For each dynamically released task, the source robot first calculates the TTL upper bound of the task, and the protected progressive expansion mechanism is then applied to determine the final propagation range. After that, MPDM performs task allocation based on the candidate robot set formed within the determined propagation range.
 
@@ -405,7 +406,11 @@ Algorithm~\ref{alg:ppat} summarizes the event-driven communication controller. A
 \If{$\mathcal{C}^{\mathrm{imm}}_j(h_j,t)\neq\varnothing$}
     \State Mark the controller ready and hand the task to MPDM
 \Else
-    \State Compute $w_j(t)$ using Eq.~\ref{eq:local_wait}
+    \State $w_j(t)\gets\begin{cases}
+        \displaystyle\min_{r_i\in\mathcal{F}_j(h_j,t)}\max\{\widehat B_i-t,0\},
+        &\mathcal{F}_j(h_j,t)\neq\varnothing,\\
+        +\infty,&\mathcal{F}_j(h_j,t)=\varnothing.
+    \end{cases}$
     \If{$w_j(t)\leq W_j$}
         \State Retain $h_j$ and schedule reassessment at $t+\max\{\Delta_c,w_j(t)\}$
     \ElsIf{$h_j<H_j$}
@@ -431,50 +436,37 @@ The experiments are conducted in a two-dimensional decentralized multi-robot tas
 
 To ensure a fair comparison, all methods are evaluated under the same task scenarios, robot settings, and random seeds. In the experiments, the TTL upper bound uses the fixed heuristic coefficients reported in Table~\ref{tab:exp_parameters}, together with normalized task resource demand and candidate sufficiency. The evaluation metrics include the number of completed tasks (NTC), the number of transmitted messages (MSG), messages per completed task (MSG/NTC), total travel delay (TTD), and make-span time (MST). The main experimental parameters are listed in Table~\ref{tab:exp_parameters}.
 \begin{table}[htb]
-	\centering
-	\caption{Experimental Parameters}
-	\label{tab:exp_parameters}
-\resizebox{\tableReferenceWidth}{!}{%
-\begin{tabular}{ll}
-		\toprule
-		Parameter & Value \\
-		\midrule
-		Workspace size & $1000 \times 1000$ m \\
-		Number of robots & 60 \\
-		Maximum number of tasks & 1000 \\
-		Simulation time & 500 s \\
-		Time step & 1 s \\
-		Task arrival rate & 2 tasks/s (exponential interarrival times) \\
-		Task release mode & Dynamic release \\
-		Task centers & $(250,250)$, $(700,250)$, $(250,700)$, $(700,700)$ \\
-		Task cluster standard deviation & 150 m \\
-		Communication protocol & NetFlood \\
-		Task allocator & MPDM; lightweight MARL (auxiliary) \\
-		Communication radius & 100 m \\
-		Task discovery radius & 50 m \\
-		Robot speed & 10 m/s \\
-		Initial robot resource & 70 \\
-		Task resource demand & $[8,25]$ \\
-		Task execution time & $[10,30]$ s \\
-		TTL range & $[1,5]$ \\
-		Compared methods & Fixed TTL = 1--5, PP-AT \\
-		Number of random seeds & 20 per allocator group \\
-		MPDM random seeds & 75001--75020 \\
-		MARL random seeds & 77001--77020 \\
-		Collection interval $\Delta_c$ & 1 s \\
-		Waiting thresholds $(W_{\min},W_{\max})$ & (10, 60) s \\
-		State refresh threshold $A_{\max}$ & 5 s \\
-		$\theta_0$ & 1.7 \\
-		$\theta_1$ & 0.5 \\
-		$\theta_2$ & 0.4 \\
-		$\theta_3$ & 1.2 \\
-		$\theta_4$ & 0.3 \\
-		$N_{\mathrm{ref}}$ & 2 \\
-		$\epsilon$ & $10^{-6}$ \\
-		Message counting mode & Link copies \\
-		\bottomrule
-	\end{tabular}
-}
+\centering
+\caption{Experimental Parameters}
+\label{tab:exp_parameters}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\tableReferenceWidth}{@{}>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Parameter & Value & Parameter & Value \\
+\midrule
+Workspace size & $1000 \times 1000$ m & TTL range & $[1,5]$ \\
+Number of robots & 60 & Compared methods & Fixed TTL = 1--5, PP-AT \\
+Maximum number of tasks & 1000 & Number of random seeds & 20 per allocator group \\
+Simulation time & 500 s & MPDM random seeds & 75001--75020 \\
+Time step & 1 s & MARL random seeds & 77001--77020 \\
+Task arrival rate & 2 tasks/s (exponential interarrival times) & Collection interval $\Delta_c$ & 1 s \\
+Task release mode & Dynamic release & Waiting thresholds $(W_{\min},W_{\max})$ & (10, 60) s \\
+Task centers & $(250,250)$, $(700,250)$, $(250,700)$, $(700,700)$ & State refresh threshold $A_{\max}$ & 5 s \\
+Task cluster standard deviation & 150 m & $\theta_0$ & 1.7 \\
+Communication protocol & NetFlood & $\theta_1$ & 0.5 \\
+Task allocator & MPDM; lightweight MARL (auxiliary) & $\theta_2$ & 0.4 \\
+Communication radius & 100 m & $\theta_3$ & 1.2 \\
+Task discovery radius & 50 m & $\theta_4$ & 0.3 \\
+Robot speed & 10 m/s & $N_{\mathrm{ref}}$ & 2 \\
+Initial robot resource & 70 & $\epsilon$ & $10^{-6}$ \\
+Task resource demand & $[8,25]$ & Message counting mode & Link copies \\
+Task execution time & $[10,30]$ s &  &  \\
+\bottomrule
+\end{tabularx}
+\endgroup
 \end{table}
 
 The environment follows the workspace geometry, task clusters, robot speed, discovery radius, and execution-time range stated in the reference study~\cite{nayak2025limited}. The 60-robot, 2-tasks/s case is used as the base setting. Parameters not fully specified in that study are explicit implementation assumptions: a 500-s horizon, a 1-s time step and collection interval, exponential task interarrival times, uniform resource demand in $[8,25]$, uniform priority in $[0,1]$, and deterministic random-waypoint exploration by idle robots. Initial robot positions are sampled uniformly over the workspace. Task locations are sampled around the four centers with equal probability and clipped to the workspace boundary; resource demand and execution time are continuous uniform samples. This is a reference-aligned reconstruction, rather than an exact reproduction of the original simulator. Communication is limited by range, topology, and TTL; the model does not simulate a bandwidth cap, packet loss, MAC contention, or delay jitter.
