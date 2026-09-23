@@ -1,12 +1,11 @@
 \begin{table}[htb]
 \centering
-\caption{PP-AT Relative to Fixed TTL = 2--5 Under Four Environments}
+\caption{PP-AT Relative to Fixed TTL Under Four Environments}
 \label{tab:fixed_robustness}
 \begingroup\small\setlength{\tabcolsep}{4pt}
-\resizebox{\tableReferenceWidth}{!}{%
-\begin{tabular}{lrrrrr}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrrrr@{}}
 \toprule
-Environment & TTL & MSG red. (\%) & NTC change (\%) & MSG/NTC red. (\%) & Seed rate \\
+Environment & TTL & MSG reduction (\%) & NTC change (\%) & MSG/NTC reduction (\%) & Seed rate \\
 \midrule
 Base & 2 & 67.09 & +0.34 & 67.20 & 95\% \\
 Base & 3 & 84.48 & +0.26 & 84.52 & 75\% \\
@@ -25,11 +24,10 @@ Resource 30 & 3 & 77.01 & +0.50 & 77.09 & 85\% \\
 Resource 30 & 4 & 85.43 & +0.50 & 85.48 & 80\% \\
 Resource 30 & 5 & 89.41 & +0.46 & 89.43 & 75\% \\
 \bottomrule
-\end{tabular}
-}
+\end{tabular*}
 \par\smallskip
 \begin{minipage}{\linewidth}\footnotesize
-Each comparison uses 20 paired seeds (79001--79020). Positive reductions indicate lower communication overhead with PP-AT; negative NTC changes indicate fewer completed tasks. Seed rate is the fraction satisfying $\mathrm{NTC}_{\mathrm{PPAT}}\geq0.99\,\mathrm{NTC}_{\mathrm{Fixed}}$. The four cases were selected before this supplement. Eighty archived PP-AT runs are paired with 400 new fixed-TTL runs. These results cover the four selected environments, not all ten environments of the earlier AT comparison.
+Each comparison uses 20 paired seeds (79001--79020). Positive reductions indicate lower communication overhead with PP-AT. Negative NTC changes indicate fewer completed tasks. Seed rate is the fraction satisfying $\mathrm{NTC}_{\mathrm{PPAT}}\geq0.99\,\mathrm{NTC}_{\mathrm{Fixed}}$. The four cases were selected before this supplement. Eighty archived PP-AT runs are paired with 400 new fixed-TTL runs. These results are based on the four selected environments, and do not include all ten environments used in the earlier AT comparison.
 \end{minipage}
 \endgroup
 \end{table}
